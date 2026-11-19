@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import LZString from 'lz-string';
+import {original,validateCalendar} from '../src/data.js';
+import {encodeCalendar,decodeCalendar,calendarLink,progressId} from '../src/share.js';
+test('shared link round-trips all 31 days including Cyrillic and symbols',()=>{assert.deepEqual(decodeCalendar(encodeCalendar(original)),validateCalendar(original))});
+test('link preserves deployment path and replaces previous hash',()=>{const url=new URL(calendarLink(original,'https://example.org/advent/#calendar'));assert.equal(url.pathname,'/advent/');assert.ok(url.hash.startsWith('#advent='));assert.deepEqual(decodeCalendar(url.hash.slice(8)),validateCalendar(original))});
+test('malformed, oversized and unsupported payloads fail safely',()=>{for(const p of ['',null,'@broken','x'.repeat(16001),LZString.compressToEncodedURIComponent('{bad'),LZString.compressToEncodedURIComponent(JSON.stringify({v:2,calendar:original})),LZString.compressToEncodedURIComponent(JSON.stringify({v:1,calendar:{}}))])assert.throws(()=>decodeCalendar(p))});
+test('link is an immutable snapshot without completion state',()=>{const value=structuredClone(original);value.progress=[1,2];const payload=encodeCalendar(value);value.days[0].title='Changed';assert.equal(decodeCalendar(payload).days[0].title,original.days[0].title);assert.equal(decodeCalendar(payload).progress,undefined)});
+test('different shared calendars have separate stable progress keys',()=>{const value=structuredClone(original);value.days[0].text+='!';assert.notEqual(progressId(value),progressId(original));assert.equal(progressId(original),progressId(validateCalendar(original)))});
